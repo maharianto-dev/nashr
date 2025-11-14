@@ -46,7 +46,7 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
     // 3. this value is str, num, boolean => get the value
     // 4. this value is null => get the value
 
-    let mut new_json: Value;
+    let mut new_json: Value = json!(null);
     let curr_level = level.unwrap_or_else(|| 1);
 
     // println!("{:#?}", key);
@@ -55,9 +55,11 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
     match get_value_type(value) {
         ValueType::Array => {
             println!("level: {} => {:#?}: Array", curr_level, key);
-            // new_json.
+
+            new_json = json!(format!("{}: []", key));
+
+            let mut ii = 0;
             for item in value.as_array().unwrap() {
-                let mut ii = 0;
                 if item["Key"] != json!(null) {
                     key_traversal(
                         item["Key"].as_str().unwrap(),
@@ -72,6 +74,9 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
         }
         ValueType::Object => {
             println!("level: {} => {:#?}: Object", curr_level, key);
+
+            new_json = json!(format!("{}: {{}}", key));
+
             for (o_key, o_value) in value.as_object().unwrap() {
                 key_traversal(o_key, o_value, Some(curr_level + 1));
             }
@@ -106,13 +111,13 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
             );
         }
         ValueType::Boolean => {
-          println!(
+            println!(
                 "level: {} => {:#?}: {:#?}",
                 curr_level,
                 key,
                 value.as_bool().unwrap().to_string()
             );
-        },
+        }
         ValueType::Null => {
             println!("level: {} => {:#?}: {:#?}", curr_level, key, value);
         }
