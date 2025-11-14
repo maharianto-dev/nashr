@@ -3,11 +3,15 @@ use std::error::Error;
 use serde::Serialize;
 use serde_json::{json, Value};
 
+type JsonLinkedList = ();
+
 #[derive(Debug)]
 enum ValueType {
     Array,
     Object,
     Str,
+    Num,
+    Boolean,
     Null,
 }
 
@@ -23,26 +27,35 @@ impl JsonData {
     }
 
     pub fn parse(&self) -> Result<(), Box<dyn Error>> {
-        let mut counter = 1;
-        for (key, value) in self.value.as_object().unwrap() {
-            key_traversal(key, value, None);
-            counter = counter + 1;
-        }
+        let mut new_json: Value;
+        // let mut counter = 1;
+        // for (key, value) in self.value.as_object().unwrap() {
+        //     key_traversal(key, value, None);
+        //     counter = counter + 1;
+        // }
+
+        key_traversal("", &self.value, None);
+
         Ok(())
     }
 }
 
 pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
-    // 1. this value is an array loop this
-    // 2. this value is an object loop the keys
-    // 3. this value is str, get the value
-    // 4. this value is null, get the value
+    // 1. this value is an array => loop this
+    // 2. this value is an object => loop the keys
+    // 3. this value is str, num, boolean => get the value
+    // 4. this value is null => get the value
 
+    let mut new_json: Value;
     let curr_level = level.unwrap_or_else(|| 1);
+
+    // println!("{:#?}", key);
+    // println!("{:#?}", get_value_type(value));
 
     match get_value_type(value) {
         ValueType::Array => {
             println!("level: {} => {:#?}: Array", curr_level, key);
+            // new_json.
             for item in value.as_array().unwrap() {
                 let mut ii = 0;
                 if item["Key"] != json!(null) {
@@ -84,6 +97,22 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
                 }
             }
         }
+        ValueType::Num => {
+            println!(
+                "level: {} => {:#?}: {:#?}",
+                curr_level,
+                key,
+                value.as_number().unwrap().to_string()
+            );
+        }
+        ValueType::Boolean => {
+          println!(
+                "level: {} => {:#?}: {:#?}",
+                curr_level,
+                key,
+                value.as_bool().unwrap().to_string()
+            );
+        },
         ValueType::Null => {
             println!("level: {} => {:#?}: {:#?}", curr_level, key, value);
         }
@@ -97,6 +126,10 @@ fn get_value_type(value: &Value) -> ValueType {
         ValueType::Object
     } else if value.as_str() != None {
         ValueType::Str
+    } else if value.as_number() != None {
+        ValueType::Num
+    } else if value.as_bool() != None {
+        ValueType::Boolean
     } else {
         ValueType::Null
     }
