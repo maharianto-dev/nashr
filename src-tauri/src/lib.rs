@@ -1,5 +1,4 @@
 use serde::Serialize;
-use serde_json::{Error, Value};
 use uuid::Uuid;
 
 use crate::{

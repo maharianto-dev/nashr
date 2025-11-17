@@ -6,10 +6,10 @@
 
   let inputGuid = $state();
   let convertDisabled = $derived(inputGuid == null || inputGuid === "");
-  let resultGuid: GuidResult | null = $state();
+  let resultGuid: GuidResult | null | undefined = $state();
   let copyToClipboard = $state(false);
 
-  let labelMap: { [key: string]: [string] } = {
+  let labelMap: { [key: string]: string } = {
     guid_standard: "Standard",
     guid_bracketed: "Bracketed",
     guid_oracle_raw16_format: "Oracle RAW(16) format",
@@ -32,10 +32,10 @@
   async function handleGenerateClick() {
     resetResult();
     inputGuid = null;
-    const result = await invoke("generate_guid");
+    const result: BaseApiResult<GuidResult> = await invoke("generate_guid");
     if (result.is_successful) {
       resultGuid = result.payload;
-      inputGuid = resultGuid.guid_standard;
+      inputGuid = resultGuid?.guid_standard;
     }
   }
 
@@ -62,7 +62,7 @@
     <button class="btn btn-primary" disabled={convertDisabled} onclick={() => handleConvertClick()}>Convert</button>
     <button class="btn btn-primary" onclick={() => handleGenerateClick()}>Generate</button>
   </div>
-  {#if resultGuid != null && resultGuid != ""}
+  {#if resultGuid != null}
     <div class="flex flex-col w-full gap-4">
       {#each Object.keys(resultGuid) as key}
         <div class="flex flex-row w-full items-center gap-4">

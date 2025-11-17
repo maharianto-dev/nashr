@@ -34,13 +34,15 @@ impl JsonData {
         //     counter = counter + 1;
         // }
 
-        key_traversal("", &self.value, None);
+        let val = key_traversal("", &self.value, None);
+
+        println!("last result: {:#?}", val);
 
         Ok(())
     }
 }
 
-pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
+pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> Value {
     // 1. this value is an array => loop this
     // 2. this value is an object => loop the keys
     // 3. this value is str, num, boolean => get the value
@@ -56,30 +58,38 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
         ValueType::Array => {
             println!("level: {} => {:#?}: Array", curr_level, key);
 
-            new_json = json!(format!("{}: []", key));
+            new_json = serde_json::from_str("[]").unwrap();
+
+            println!("new_json: {:#?}", new_json);
 
             let mut ii = 0;
             for item in value.as_array().unwrap() {
                 if item["Key"] != json!(null) {
-                    key_traversal(
+                    new_json.as_array_mut().unwrap().push(key_traversal(
                         item["Key"].as_str().unwrap(),
                         &item["Value"],
                         Some(curr_level + 1),
-                    );
+                    ));
                 } else {
                     key_traversal(&ii.to_string(), item, Some(curr_level + 1));
                 }
                 ii = ii + 1;
             }
+            new_json
         }
         ValueType::Object => {
             println!("level: {} => {:#?}: Object", curr_level, key);
 
-            new_json = json!(format!("{}: {{}}", key));
+            new_json = serde_json::from_str("{}").unwrap();
 
             for (o_key, o_value) in value.as_object().unwrap() {
-                key_traversal(o_key, o_value, Some(curr_level + 1));
+                let new_obj = key_traversal(o_key, o_value, Some(curr_level + 1));
+                new_json
+                    .as_object_mut()
+                    .unwrap()
+                    .insert(o_key.to_string(), new_obj);
             }
+            new_json
         }
         ValueType::Str => {
             let _res: Result<Value, serde_json::Error> =
@@ -88,8 +98,12 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
                 Ok(val) => {
                     if val != json!(null) {
                         key_traversal(key, &val, Some(curr_level + 1));
+                        new_json
                     } else {
                         println!("level: {} => {:#?}: {:#?}", curr_level, key, val);
+                        let frm = format!("{:#?}: null", key);
+                        println!("frm: {}", frm);
+                        return serde_json::from_str(&frm).unwrap();
                     }
                 }
                 Err(_err) => {
@@ -99,6 +113,10 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
                         key,
                         value.as_str().unwrap()
                     );
+                    return serde_json::from_str(
+                        format!("{:#?}: {:#?}", key, value.as_str().unwrap()).as_str(),
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -109,6 +127,10 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
                 key,
                 value.as_number().unwrap().to_string()
             );
+            let val = value.as_number().unwrap().as_f64().unwrap();
+            let frm = format!("{:#?}: {:#?}", key, val);
+            println!("frm: {}", frm);
+            return serde_json::from_str(&frm).unwrap();
         }
         ValueType::Boolean => {
             println!(
@@ -117,9 +139,14 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) {
                 key,
                 value.as_bool().unwrap().to_string()
             );
+            return serde_json::from_str(
+                format!("{:#?}: {:#?}", key, value.as_bool().unwrap()).as_str(),
+            )
+            .unwrap();
         }
         ValueType::Null => {
             println!("level: {} => {:#?}: {:#?}", curr_level, key, value);
+            return serde_json::from_str(format!("{:#?}: null", key).as_str()).unwrap();
         }
     }
 }
