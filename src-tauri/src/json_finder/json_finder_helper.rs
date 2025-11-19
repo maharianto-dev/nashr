@@ -42,13 +42,13 @@ impl JsonData {
     }
 }
 
-pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> Value {
+fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
     // 1. this value is an array => loop this
     // 2. this value is an object => loop the keys
     // 3. this value is str, num, boolean => get the value
     // 4. this value is null => get the value
 
-    let mut new_json: Value = json!(null);
+    let mut new_json_str = String::new();
     let curr_level = level.unwrap_or_else(|| 1);
 
     // println!("{:#?}", key);
@@ -58,96 +58,60 @@ pub fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> Value {
         ValueType::Array => {
             println!("level: {} => {:#?}: Array", curr_level, key);
 
-            new_json = serde_json::from_str("[]").unwrap();
+            new_json_str = format!("[");
 
-            println!("new_json: {:#?}", new_json);
+            println!("new_json: {:#?}", new_json_str);
 
             let mut ii = 0;
             for item in value.as_array().unwrap() {
-                if item["Key"] != json!(null) {
-                    new_json.as_array_mut().unwrap().push(key_traversal(
-                        item["Key"].as_str().unwrap(),
-                        &item["Value"],
-                        Some(curr_level + 1),
-                    ));
-                } else {
-                    key_traversal(&ii.to_string(), item, Some(curr_level + 1));
+                new_json_str = format!(
+                    "{}{}",
+                    new_json_str,
+                    key_traversal(&ii.to_string(), item, Some(curr_level + 1))
+                );
+                if ii != value.as_array().unwrap().len() - 1 {
+                    new_json_str = format!("{},", new_json_str);
                 }
                 ii = ii + 1;
             }
-            new_json
+            new_json_str = format!("{}]", new_json_str);
+            new_json_str
         }
         ValueType::Object => {
             println!("level: {} => {:#?}: Object", curr_level, key);
 
-            new_json = serde_json::from_str("{}").unwrap();
+            if value["Key"] != Value::Null {
+                // non-standard object consists like this { "Key": "a", "Value": "b" }
+                // will be converted to "a": "b"
+                let frm = format!("{}", value["Value"]);
+                let json_ob: Value = serde_json::from_str(&frm).unwrap();
+                match json_string_check(json_ob) {
+                    ValueType::Null => format!("{}: null", value["Key"]),
+                    ValueType::Str => format!("{}: {}", value["Key"], value["Value"]),
+                    ValueType::Array => todo!(),
+                    ValueType::Object => todo!(),
+                    ValueType::Num => todo!(),
+                    ValueType::Boolean => todo!(),
+                }
+            } else {
+                new_json_str = format!("{{");
 
-            for (o_key, o_value) in value.as_object().unwrap() {
-                let new_obj = key_traversal(o_key, o_value, Some(curr_level + 1));
-                new_json
-                    .as_object_mut()
-                    .unwrap()
-                    .insert(o_key.to_string(), new_obj);
+                new_json_str = format!("{}}}", new_json_str);
+                new_json_str
             }
-            new_json
+
+            // for (o_key, o_value) in value.as_object().unwrap() {
+            //     let new_obj = key_traversal(o_key, o_value, Some(curr_level + 1));
+            //     new_json
+            //         .as_object_mut()
+            //         .unwrap()
+            //         .insert(o_key.to_string(), new_obj);
+            // }
         }
-        ValueType::Str => {
-            let _res: Result<Value, serde_json::Error> =
-                serde_json::from_str(value.as_str().unwrap());
-            match _res {
-                Ok(val) => {
-                    if val != json!(null) {
-                        key_traversal(key, &val, Some(curr_level + 1));
-                        new_json
-                    } else {
-                        println!("level: {} => {:#?}: {:#?}", curr_level, key, val);
-                        let frm = format!("{:#?}: null", key);
-                        println!("frm: {}", frm);
-                        return serde_json::from_str(&frm).unwrap();
-                    }
-                }
-                Err(_err) => {
-                    println!(
-                        "level: {} => {:#?}: {:#?}",
-                        curr_level,
-                        key,
-                        value.as_str().unwrap()
-                    );
-                    return serde_json::from_str(
-                        format!("{:#?}: {:#?}", key, value.as_str().unwrap()).as_str(),
-                    )
-                    .unwrap();
-                }
-            }
-        }
-        ValueType::Num => {
-            println!(
-                "level: {} => {:#?}: {:#?}",
-                curr_level,
-                key,
-                value.as_number().unwrap().to_string()
-            );
-            let val = value.as_number().unwrap().as_f64().unwrap();
-            let frm = format!("{:#?}: {:#?}", key, val);
-            println!("frm: {}", frm);
-            return serde_json::from_str(&frm).unwrap();
-        }
-        ValueType::Boolean => {
-            println!(
-                "level: {} => {:#?}: {:#?}",
-                curr_level,
-                key,
-                value.as_bool().unwrap().to_string()
-            );
-            return serde_json::from_str(
-                format!("{:#?}: {:#?}", key, value.as_bool().unwrap()).as_str(),
-            )
-            .unwrap();
-        }
-        ValueType::Null => {
-            println!("level: {} => {:#?}: {:#?}", curr_level, key, value);
-            return serde_json::from_str(format!("{:#?}: null", key).as_str()).unwrap();
-        }
+        ValueType::Str => todo!(),
+        ValueType::Num => todo!(),
+        ValueType::Boolean => todo!(),
+        ValueType::Null => todo!(),
     }
 }
 
@@ -164,5 +128,15 @@ fn get_value_type(value: &Value) -> ValueType {
         ValueType::Boolean
     } else {
         ValueType::Null
+    }
+}
+
+fn json_string_check(value: Value) -> ValueType {
+    let frm = value.as_str().unwrap();
+    println!("json_string_check::frm: {}", frm);
+    let json_ob = serde_json::from_str(frm);
+    match json_ob {
+        Ok(val) => get_value_type(&val),
+        Err(_) => ValueType::Str,
     }
 }
