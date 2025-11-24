@@ -85,7 +85,8 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
                 // will be converted to object { "a": "b" }
                 let frm = format!("{}", value["Value"]);
                 let json_ob: Value = serde_json::from_str(&frm).unwrap();
-                match json_string_check(json_ob) {
+                dbg!(json_string_check(&json_ob));
+                match json_string_check(&json_ob) {
                     ValueType::Null => format!("{{\"{}\": null}}", value["Key"].as_str().unwrap()),
                     ValueType::Str => format!(
                         "{{\"{}\": \"{}\"}}",
@@ -93,16 +94,22 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
                         value["Value"].as_str().unwrap()
                     ),
                     ValueType::Array => todo!(),
-                    ValueType::Object => todo!(),
+                    ValueType::Object => format!(
+                        "{{\"{}\": {}}}",
+                        value["Key"].as_str().unwrap(),
+                        key_traversal(
+                            value["Key"].as_str().unwrap(),
+                            &value["Value"],
+                            Some(curr_level + 1)
+                        )
+                    ),
                     ValueType::Num => format!(
-                        "{}\"{}\": {}",
-                        new_json_str,
+                        "{{\"{}\": {}}}",
                         value["Key"].as_str().unwrap(),
                         value["Value"].as_number().unwrap()
                     ),
                     ValueType::Boolean => format!(
-                        "{}\"{}\": {}",
-                        new_json_str,
+                        "{{\"{}\": {}}}",
                         value["Key"].as_str().unwrap(),
                         value["Value"].as_bool().unwrap()
                     ),
@@ -133,7 +140,14 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
                                 key_traversal(o_key, o_value, Some(curr_level + 1))
                             );
                         }
-                        ValueType::Object => todo!(),
+                        ValueType::Object => {
+                            new_json_str = format!(
+                                "{}\"{}\": {}",
+                                new_json_str,
+                                o_key.as_str(),
+                                key_traversal(o_key, o_value, Some(curr_level + 1))
+                            );
+                        }
                         ValueType::Num => {
                             new_json_str = format!(
                                 "{}\"{}\": {}",
@@ -190,7 +204,7 @@ fn get_value_type(value: &Value) -> ValueType {
     }
 }
 
-fn json_string_check(value: Value) -> ValueType {
+fn json_string_check(value: &Value) -> ValueType {
     let frm = value.as_str().unwrap();
     println!("json_string_check::frm: {}", frm);
     let json_ob = serde_json::from_str(frm);
