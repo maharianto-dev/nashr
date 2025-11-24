@@ -36,7 +36,7 @@ impl JsonData {
 
         let val = key_traversal("", &self.value, None);
 
-        println!("last result: {:#?}", val);
+        println!("last result: {}", val);
 
         Ok(())
     }
@@ -82,20 +82,79 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
 
             if value["Key"] != Value::Null {
                 // non-standard object consists like this { "Key": "a", "Value": "b" }
-                // will be converted to "a": "b"
+                // will be converted to object { "a": "b" }
                 let frm = format!("{}", value["Value"]);
                 let json_ob: Value = serde_json::from_str(&frm).unwrap();
                 match json_string_check(json_ob) {
-                    ValueType::Null => format!("{}: null", value["Key"]),
-                    ValueType::Str => format!("{}: {}", value["Key"], value["Value"]),
+                    ValueType::Null => format!("{{\"{}\": null}}", value["Key"].as_str().unwrap()),
+                    ValueType::Str => format!(
+                        "{{\"{}\": \"{}\"}}",
+                        value["Key"].as_str().unwrap(),
+                        value["Value"].as_str().unwrap()
+                    ),
                     ValueType::Array => todo!(),
                     ValueType::Object => todo!(),
-                    ValueType::Num => todo!(),
-                    ValueType::Boolean => todo!(),
+                    ValueType::Num => format!(
+                        "{}\"{}\": {}",
+                        new_json_str,
+                        value["Key"].as_str().unwrap(),
+                        value["Value"].as_number().unwrap()
+                    ),
+                    ValueType::Boolean => format!(
+                        "{}\"{}\": {}",
+                        new_json_str,
+                        value["Key"].as_str().unwrap(),
+                        value["Value"].as_bool().unwrap()
+                    ),
                 }
             } else {
                 new_json_str = format!("{{");
 
+                for (index, (o_key, o_value)) in value.as_object().unwrap().iter().enumerate() {
+                    let frm = format!("{}", o_value);
+                    let json_ob: Value = serde_json::from_str(&frm).unwrap();
+                    match get_value_type(&json_ob) {
+                        ValueType::Null => {
+                            new_json_str = format!("{}\"{}\": null", new_json_str, o_key.as_str());
+                        }
+                        ValueType::Str => {
+                            new_json_str = format!(
+                                "{}\"{}\": \"{}\"",
+                                new_json_str,
+                                o_key.as_str(),
+                                o_value.as_str().unwrap()
+                            );
+                        }
+                        ValueType::Array => {
+                            new_json_str = format!(
+                                "{}\"{}\":{}",
+                                new_json_str,
+                                o_key.as_str(),
+                                key_traversal(o_key, o_value, Some(curr_level + 1))
+                            );
+                        }
+                        ValueType::Object => todo!(),
+                        ValueType::Num => {
+                            new_json_str = format!(
+                                "{}\"{}\": {}",
+                                new_json_str,
+                                o_key.as_str(),
+                                o_value.as_number().unwrap()
+                            );
+                        }
+                        ValueType::Boolean => {
+                            new_json_str = format!(
+                                "{}\"{}\": {}",
+                                new_json_str,
+                                o_key.as_str(),
+                                o_value.as_bool().unwrap()
+                            );
+                        }
+                    }
+                    if index != value.as_object().unwrap().len() - 1 {
+                        new_json_str = format!("{},", new_json_str);
+                    }
+                }
                 new_json_str = format!("{}}}", new_json_str);
                 new_json_str
             }

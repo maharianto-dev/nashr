@@ -23,7 +23,9 @@
 
   async function handleConvertClick() {
     resetResult();
-    const result: BaseApiResult<GuidResult> = await invoke("convert_guid", { guidInput: inputGuid });
+    const result: BaseApiResult<GuidResult> = await invoke("convert_guid", {
+      guidInput: inputGuid,
+    });
     if (result.is_successful) {
       resultGuid = result.payload;
     }
@@ -58,9 +60,20 @@
 <div class="w-full flex flex-col gap-4">
   <div class="flex flex-row w-full items-center gap-4">
     <p class="w-[20%]">Convert your GUID here!</p>
-    <input bind:value={inputGuid} type="text" placeholder="Insert your guid here" class="input w-[40%]" />
-    <button class="btn btn-primary" disabled={convertDisabled} onclick={() => handleConvertClick()}>Convert</button>
-    <button class="btn btn-primary" onclick={() => handleGenerateClick()}>Generate</button>
+    <input
+      bind:value={inputGuid}
+      type="text"
+      placeholder="Insert your guid here"
+      class="input w-[40%]"
+    />
+    <button
+      class="btn btn-primary"
+      disabled={convertDisabled}
+      onclick={() => handleConvertClick()}>Convert</button
+    >
+    <button class="btn btn-primary" onclick={() => handleGenerateClick()}
+      >Generate</button
+    >
   </div>
   {#if resultGuid != null}
     <div class="flex flex-col w-full gap-4">
@@ -68,8 +81,16 @@
         <div class="flex flex-row w-full items-center gap-4">
           <p class="w-[20%]">{labelMap[key]}</p>
           <div class="join w-[40%]">
-            <input bind:value={resultGuid[key]} type="text" class="input join-item w-full" disabled />
-            <button class="btn btn-primary" onclick={() => handleCopyToClipboardClick(resultGuid[key], key)}
+            <input
+              bind:value={resultGuid[key]}
+              type="text"
+              class="input join-item w-full"
+              disabled
+            />
+            <button
+              class="btn btn-primary"
+              onclick={() => handleCopyToClipboardClick(resultGuid[key], key)}
+              title="Copy to clipboard"
               ><svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
@@ -87,7 +108,11 @@
             </button>
           </div>
           {#if copyToClipboard === true}
-            <div class="tooltip {key} rounded-sm p-1 bg-green-300 text-black font-semibold">Copied to clipboard!</div>
+            <div
+              class="tooltip {key} rounded-sm p-1 bg-green-300 text-black font-semibold"
+            >
+              Copied to clipboard!
+            </div>
           {/if}
         </div>
       {/each}
