@@ -1,9 +1,10 @@
-use std::error::Error;
+use std::{
+    error::Error,
+    io::{self, Write},
+};
 
 use serde::Serialize;
-use serde_json::{json, Value};
-
-type JsonLinkedList = ();
+use serde_json::Value;
 
 #[derive(Debug)]
 enum ValueType {
@@ -13,6 +14,11 @@ enum ValueType {
     Num,
     Boolean,
     Null,
+}
+
+enum StrFormatType {
+    NewLine,
+    NonNewLine,
 }
 
 #[derive(Serialize)]
@@ -26,19 +32,14 @@ impl JsonData {
         Ok(JsonData { value: v_result })
     }
 
-    pub fn parse(&self) -> Result<(), Box<dyn Error>> {
-        let mut new_json: Value;
-        // let mut counter = 1;
-        // for (key, value) in self.value.as_object().unwrap() {
-        //     key_traversal(key, value, None);
-        //     counter = counter + 1;
-        // }
-
+    pub fn parse(&self) -> String {
         let val = key_traversal("", &self.value, None);
-
         println!("last result: {}", val);
-
-        Ok(())
+        let formatted = format_json_string(val);
+        dbg!(&formatted);
+        print!("{}", &formatted);
+        io::stdout().flush().unwrap(); // Flush the output buffer
+        formatted
     }
 }
 
@@ -50,17 +51,9 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
 
     let mut new_json_str = String::new();
     let curr_level = level.unwrap_or_else(|| 1);
-
-    // println!("{:#?}", key);
-    // println!("{:#?}", get_value_type(value));
-
     match get_value_type(value) {
         ValueType::Array => {
-            println!("level: {} => {:#?}: Array", curr_level, key);
-
             new_json_str = format!("[");
-
-            println!("new_json: {:#?}", new_json_str);
 
             let mut ii = 0;
             for item in value.as_array().unwrap() {
@@ -78,16 +71,15 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
             new_json_str
         }
         ValueType::Object => {
-            println!("level: {} => {:#?}: Object", curr_level, key);
-
             if value["Key"] != Value::Null {
                 // non-standard object consists like this { "Key": "a", "Value": "b" }
                 // will be converted to object { "a": "b" }
                 let frm = format!("{}", value["Value"]);
                 let json_ob: Value = serde_json::from_str(&frm).unwrap();
-                dbg!(json_string_check(&json_ob));
                 match json_string_check(&json_ob) {
-                    ValueType::Null => format!("{{\"{}\": null}}", value["Key"].as_str().unwrap()),
+                    ValueType::Null => {
+                        format!("{{\"{}\": null}}", value["Key"].as_str().unwrap())
+                    }
                     ValueType::Str => format!(
                         "{{\"{}\": \"{}\"}}",
                         value["Key"].as_str().unwrap(),
@@ -95,8 +87,7 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
                     ),
                     ValueType::Array => todo!(),
                     ValueType::Object => format!(
-                        "{{\"{}\": {}}}",
-                        value["Key"].as_str().unwrap(),
+                        "{{{}}}",
                         key_traversal(
                             value["Key"].as_str().unwrap(),
                             &value["Value"],
@@ -172,19 +163,16 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
                 new_json_str = format!("{}}}", new_json_str);
                 new_json_str
             }
-
-            // for (o_key, o_value) in value.as_object().unwrap() {
-            //     let new_obj = key_traversal(o_key, o_value, Some(curr_level + 1));
-            //     new_json
-            //         .as_object_mut()
-            //         .unwrap()
-            //         .insert(o_key.to_string(), new_obj);
-            // }
         }
-        ValueType::Str => todo!(),
-        ValueType::Num => todo!(),
-        ValueType::Boolean => todo!(),
-        ValueType::Null => todo!(),
+        ValueType::Str => {
+            match get_value_type(&serde_json::from_str(value.as_str().unwrap()).unwrap()) {
+                ValueType::Object => format!("\"{}\":{}", key, value.as_str().unwrap()),
+                _ => format!("\"{}\":\"{}\"", key, value.as_str().unwrap()),
+            }
+        }
+        ValueType::Num => format!("\"{}\":{}", key, value.as_number().unwrap()),
+        ValueType::Boolean => format!("\"{}\":{}", key, value.as_bool().unwrap()),
+        ValueType::Null => format!("\"{}\": null", key),
     }
 }
 
@@ -206,10 +194,53 @@ fn get_value_type(value: &Value) -> ValueType {
 
 fn json_string_check(value: &Value) -> ValueType {
     let frm = value.as_str().unwrap();
-    println!("json_string_check::frm: {}", frm);
     let json_ob = serde_json::from_str(frm);
     match json_ob {
         Ok(val) => get_value_type(&val),
         Err(_) => ValueType::Str,
+    }
+}
+
+fn format_json_string(json_string: String) -> String {
+    let mut retval = String::new();
+    let mut indent_level = 0;
+    let mut previous_char: char = ' ';
+    for char in json_string.chars().into_iter() {
+        match char {
+            '{' | '[' => {
+                indent_level += 1;
+                let indent = "\t".repeat(indent_level);
+                retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLine);
+            }
+            '}' | ']' => {
+                indent_level -= 1;
+                let indent = "\t".repeat(indent_level);
+                retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLine);
+            }
+            ',' => {
+                let indent = "\t".repeat(indent_level);
+                match previous_char {
+                    '\"' => {
+                        retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLine)
+                    }
+                    _ => retval = str_formatter(&retval, char, None, StrFormatType::NonNewLine),
+                }
+            }
+            _ => retval = str_formatter(&retval, char, None, StrFormatType::NonNewLine),
+        }
+        previous_char = char;
+    }
+    retval
+}
+
+fn str_formatter(
+    prefix_str: &str,
+    char_to_input: char,
+    indent: Option<String>,
+    format_type: StrFormatType,
+) -> String {
+    match format_type {
+        StrFormatType::NewLine => format!("{}{}\n{}", prefix_str, char_to_input, indent.unwrap()),
+        StrFormatType::NonNewLine => format!("{}{}", prefix_str, char_to_input),
     }
 }

@@ -68,11 +68,11 @@ fn parse_and_find_json(input_key: Option<&str>, input_json: &str) -> BaseApiRetu
     // let v_result: Result<Value, Error> = serde_json::from_str(input_json);
     match json_result {
         Ok(json_data) => {
-            let _ = json_data.parse();
+            let formatted_json = json_data.parse();
             BaseApiReturn {
                 is_successful: true,
                 message: None,
-                payload: Some(format!("{:?}", json_data.value)),
+                payload: Some(formatted_json),
             }
         }
         Err(error) => BaseApiReturn {
