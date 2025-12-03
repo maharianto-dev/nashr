@@ -17,7 +17,8 @@ enum ValueType {
 }
 
 enum StrFormatType {
-    NewLine,
+    NewLineOpen,
+    NewLineClose,
     NonNewLine,
 }
 
@@ -36,9 +37,9 @@ impl JsonData {
         let val = key_traversal("", &self.value, None);
         println!("last result: {}", val);
         let formatted = format_json_string(val);
-        dbg!(&formatted);
-        print!("{}", &formatted);
-        io::stdout().flush().unwrap(); // Flush the output buffer
+        // dbg!(&formatted);
+        // print!("{}", &formatted);
+        // io::stdout().flush().unwrap(); // Flush the output buffer
         formatted
     }
 }
@@ -51,6 +52,8 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
 
     let mut new_json_str = String::new();
     let curr_level = level.unwrap_or_else(|| 1);
+    dbg!(key);
+    dbg!(get_value_type(value));
     match get_value_type(value) {
         ValueType::Array => {
             new_json_str = format!("[");
@@ -76,6 +79,8 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
                 // will be converted to object { "a": "b" }
                 let frm = format!("{}", value["Value"]);
                 let json_ob: Value = serde_json::from_str(&frm).unwrap();
+                dbg!(&json_ob);
+                dbg!(json_string_check(&json_ob));
                 match json_string_check(&json_ob) {
                     ValueType::Null => {
                         format!("{{\"{}\": null}}", value["Key"].as_str().unwrap())
@@ -85,7 +90,14 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
                         value["Key"].as_str().unwrap(),
                         value["Value"].as_str().unwrap()
                     ),
-                    ValueType::Array => todo!(),
+                    ValueType::Array => format!(
+                        "{{{}}}",
+                        key_traversal(
+                            value["Key"].as_str().unwrap(),
+                            &value["Value"],
+                            Some(curr_level + 1)
+                        )
+                    ),
                     ValueType::Object => format!(
                         "{{{}}}",
                         key_traversal(
@@ -166,7 +178,9 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
         }
         ValueType::Str => {
             match get_value_type(&serde_json::from_str(value.as_str().unwrap()).unwrap()) {
-                ValueType::Object => format!("\"{}\":{}", key, value.as_str().unwrap()),
+                ValueType::Object | ValueType::Array => {
+                    format!("\"{}\":{}", key, value.as_str().unwrap())
+                }
                 _ => format!("\"{}\":\"{}\"", key, value.as_str().unwrap()),
             }
         }
@@ -210,18 +224,19 @@ fn format_json_string(json_string: String) -> String {
             '{' | '[' => {
                 indent_level += 1;
                 let indent = "\t".repeat(indent_level);
-                retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLine);
+                retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLineOpen);
             }
             '}' | ']' => {
                 indent_level -= 1;
                 let indent = "\t".repeat(indent_level);
-                retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLine);
+                retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLineClose);
             }
             ',' => {
                 let indent = "\t".repeat(indent_level);
                 match previous_char {
-                    '\"' => {
-                        retval = str_formatter(&retval, char, Some(indent), StrFormatType::NewLine)
+                    '\"' | ']' | '}' => {
+                        retval =
+                            str_formatter(&retval, char, Some(indent), StrFormatType::NewLineOpen)
                     }
                     _ => retval = str_formatter(&retval, char, None, StrFormatType::NonNewLine),
                 }
@@ -240,7 +255,12 @@ fn str_formatter(
     format_type: StrFormatType,
 ) -> String {
     match format_type {
-        StrFormatType::NewLine => format!("{}{}\n{}", prefix_str, char_to_input, indent.unwrap()),
+        StrFormatType::NewLineOpen => {
+            format!("{}{}\n{}", prefix_str, char_to_input, indent.unwrap())
+        }
         StrFormatType::NonNewLine => format!("{}{}", prefix_str, char_to_input),
+        StrFormatType::NewLineClose => {
+            format!("{}\n{}{}", prefix_str, indent.unwrap(), char_to_input)
+        }
     }
 }
