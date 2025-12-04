@@ -177,6 +177,9 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
             }
         }
         ValueType::Str => {
+            dbg!(get_value_type(
+                &serde_json::from_str(value.as_str().unwrap()).unwrap()
+            ));
             match get_value_type(&serde_json::from_str(value.as_str().unwrap()).unwrap()) {
                 ValueType::Object | ValueType::Array => {
                     format!("\"{}\":{}", key, value.as_str().unwrap())
