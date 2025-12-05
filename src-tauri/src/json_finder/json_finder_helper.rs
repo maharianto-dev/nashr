@@ -6,7 +6,7 @@ use std::{
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum ValueType {
     Array,
     Object,
@@ -54,138 +54,49 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
     let curr_level = level.unwrap_or_else(|| 1);
     dbg!(key);
     dbg!(get_value_type(value));
+    dbg!(value);
     match get_value_type(value) {
         ValueType::Array => {
-            new_json_str = format!("[");
-
             let mut ii = 0;
             for item in value.as_array().unwrap() {
-                new_json_str = format!(
-                    "{}{}",
-                    new_json_str,
-                    key_traversal(&ii.to_string(), item, Some(curr_level + 1))
-                );
-                if ii != value.as_array().unwrap().len() - 1 {
-                    new_json_str = format!("{},", new_json_str);
-                }
+                // new_json_str = format!(
+                //     "{}{}",
+                //     new_json_str,
+                //     key_traversal(&ii.to_string(), item, Some(curr_level + 1))
+                // );
+                // if ii != value.as_array().unwrap().len() - 1 {
+                //     new_json_str = format!("{},", new_json_str);
+                // }
+                key_traversal(&ii.to_string(), item, Some(curr_level + 1));
                 ii = ii + 1;
             }
-            new_json_str = format!("{}]", new_json_str);
-            new_json_str
+            String::new()
         }
         ValueType::Object => {
             if value["Key"] != Value::Null {
-                // non-standard object consists like this { "Key": "a", "Value": "b" }
-                // will be converted to object { "a": "b" }
-                let frm = format!("{}", value["Value"]);
-                let json_ob: Value = serde_json::from_str(&frm).unwrap();
-                dbg!(&json_ob);
-                dbg!(json_string_check(&json_ob));
-                match json_string_check(&json_ob) {
-                    ValueType::Null => {
-                        format!("{{\"{}\": null}}", value["Key"].as_str().unwrap())
-                    }
-                    ValueType::Str => format!(
-                        "{{\"{}\": \"{}\"}}",
-                        value["Key"].as_str().unwrap(),
-                        value["Value"].as_str().unwrap()
-                    ),
-                    ValueType::Array => format!(
-                        "{{{}}}",
-                        key_traversal(
-                            value["Key"].as_str().unwrap(),
-                            &value["Value"],
-                            Some(curr_level + 1)
-                        )
-                    ),
-                    ValueType::Object => format!(
-                        "{{{}}}",
-                        key_traversal(
-                            value["Key"].as_str().unwrap(),
-                            &value["Value"],
-                            Some(curr_level + 1)
-                        )
-                    ),
-                    ValueType::Num => format!(
-                        "{{\"{}\": {}}}",
-                        value["Key"].as_str().unwrap(),
-                        value["Value"].as_number().unwrap()
-                    ),
-                    ValueType::Boolean => format!(
-                        "{{\"{}\": {}}}",
-                        value["Key"].as_str().unwrap(),
-                        value["Value"].as_bool().unwrap()
-                    ),
-                }
+                key_traversal(
+                    value["Key"].as_str().unwrap(),
+                    &value["Value"],
+                    Some((curr_level + 1)),
+                );
             } else {
-                new_json_str = format!("{{");
-
                 for (index, (o_key, o_value)) in value.as_object().unwrap().iter().enumerate() {
-                    let frm = format!("{}", o_value);
-                    let json_ob: Value = serde_json::from_str(&frm).unwrap();
-                    match get_value_type(&json_ob) {
-                        ValueType::Null => {
-                            new_json_str = format!("{}\"{}\": null", new_json_str, o_key.as_str());
-                        }
-                        ValueType::Str => {
-                            new_json_str = format!(
-                                "{}\"{}\": \"{}\"",
-                                new_json_str,
-                                o_key.as_str(),
-                                o_value.as_str().unwrap()
-                            );
-                        }
-                        ValueType::Array => {
-                            new_json_str = format!(
-                                "{}\"{}\":{}",
-                                new_json_str,
-                                o_key.as_str(),
-                                key_traversal(o_key, o_value, Some(curr_level + 1))
-                            );
-                        }
-                        ValueType::Object => {
-                            new_json_str = format!(
-                                "{}\"{}\": {}",
-                                new_json_str,
-                                o_key.as_str(),
-                                key_traversal(o_key, o_value, Some(curr_level + 1))
-                            );
-                        }
-                        ValueType::Num => {
-                            new_json_str = format!(
-                                "{}\"{}\": {}",
-                                new_json_str,
-                                o_key.as_str(),
-                                o_value.as_number().unwrap()
-                            );
-                        }
-                        ValueType::Boolean => {
-                            new_json_str = format!(
-                                "{}\"{}\": {}",
-                                new_json_str,
-                                o_key.as_str(),
-                                o_value.as_bool().unwrap()
-                            );
-                        }
-                    }
-                    if index != value.as_object().unwrap().len() - 1 {
-                        new_json_str = format!("{},", new_json_str);
-                    }
+                    key_traversal(o_key, o_value, Some((curr_level + 1)));
                 }
-                new_json_str = format!("{}}}", new_json_str);
-                new_json_str
             }
+            String::new()
         }
         ValueType::Str => {
-            dbg!(get_value_type(
-                &serde_json::from_str(value.as_str().unwrap()).unwrap()
-            ));
-            match get_value_type(&serde_json::from_str(value.as_str().unwrap()).unwrap()) {
-                ValueType::Object | ValueType::Array => {
-                    format!("\"{}\":{}", key, value.as_str().unwrap())
-                }
-                _ => format!("\"{}\":\"{}\"", key, value.as_str().unwrap()),
+            dbg!(value);
+            dbg!(json_string_check(value));
+            if json_string_check(value) != ValueType::Str {
+                key_traversal(
+                    key,
+                    &serde_json::from_str(value.as_str().unwrap()).unwrap(),
+                    Some((curr_level + 1)),
+                );
             }
+            String::new()
         }
         ValueType::Num => format!("\"{}\":{}", key, value.as_number().unwrap()),
         ValueType::Boolean => format!("\"{}\":{}", key, value.as_bool().unwrap()),
