@@ -50,53 +50,93 @@ fn key_traversal(key: &str, value: &Value, level: Option<i32>) -> String {
     // 3. this value is str, num, boolean => get the value
     // 4. this value is null => get the value
 
-    let mut new_json_str = String::new();
+    // let mut new_json_str = String::new();
     let curr_level = level.unwrap_or_else(|| 1);
     dbg!(key);
-    dbg!(get_value_type(value));
     dbg!(value);
+    dbg!(get_value_type(value));
     match get_value_type(value) {
         ValueType::Array => {
             let mut ii = 0;
+            let key_prefix = if key != "" {
+                format!("\"{}\":", key)
+            } else {
+                String::from("")
+            };
+            let mut new_array_string = format!("{}[", key_prefix);
             for item in value.as_array().unwrap() {
-                // new_json_str = format!(
-                //     "{}{}",
-                //     new_json_str,
-                //     key_traversal(&ii.to_string(), item, Some(curr_level + 1))
-                // );
+                new_array_string = format!(
+                    "{}{}",
+                    new_array_string,
+                    key_traversal(&ii.to_string(), item, Some(curr_level + 1))
+                );
                 // if ii != value.as_array().unwrap().len() - 1 {
-                //     new_json_str = format!("{},", new_json_str);
+                //     new_array_string = format!("{},", new_array_string);
                 // }
                 key_traversal(&ii.to_string(), item, Some(curr_level + 1));
                 ii = ii + 1;
             }
-            String::new()
+            new_array_string = format!("{}]", new_array_string);
+            new_array_string
         }
         ValueType::Object => {
+            let mut new_object_string = String::new();
             if value["Key"] != Value::Null {
-                key_traversal(
-                    value["Key"].as_str().unwrap(),
-                    &value["Value"],
-                    Some((curr_level + 1)),
+                new_object_string = format!(
+                    "{},{}",
+                    new_object_string,
+                    key_traversal(
+                        value["Key"].as_str().unwrap(),
+                        &value["Value"],
+                        Some(curr_level + 1),
+                    )
                 );
             } else {
+                new_object_string = format!("{{");
                 for (index, (o_key, o_value)) in value.as_object().unwrap().iter().enumerate() {
-                    key_traversal(o_key, o_value, Some((curr_level + 1)));
+                    if index == 0 {
+                        new_object_string = format!(
+                            "{}{}",
+                            new_object_string,
+                            key_traversal(o_key, o_value, Some(curr_level + 1))
+                        );
+                    } else {
+                        new_object_string = format!(
+                            "{},{}",
+                            new_object_string,
+                            key_traversal(o_key, o_value, Some(curr_level + 1))
+                        );
+                    }
                 }
+                new_object_string = format!("{}}}", new_object_string);
             }
-            String::new()
+            new_object_string
         }
         ValueType::Str => {
-            dbg!(value);
-            dbg!(json_string_check(value));
-            if json_string_check(value) != ValueType::Str {
-                key_traversal(
-                    key,
-                    &serde_json::from_str(value.as_str().unwrap()).unwrap(),
-                    Some((curr_level + 1)),
-                );
+            let jsc_value = json_string_check(value);
+            if jsc_value != ValueType::Str {
+                if jsc_value == ValueType::Array || jsc_value == ValueType::Object {
+                    return format!(
+                        "\"{}\":{}",
+                        key,
+                        key_traversal(
+                            key,
+                            &serde_json::from_str(value.as_str().unwrap()).unwrap(),
+                            Some(curr_level + 1),
+                        )
+                    );
+                } else {
+                    return format!(
+                        "{}",
+                        key_traversal(
+                            key,
+                            &serde_json::from_str(value.as_str().unwrap()).unwrap(),
+                            Some(curr_level + 1),
+                        )
+                    );
+                }
             }
-            String::new()
+            format!("\"{}\":\"{}\"", key, value.as_str().unwrap())
         }
         ValueType::Num => format!("\"{}\":{}", key, value.as_number().unwrap()),
         ValueType::Boolean => format!("\"{}\":{}", key, value.as_bool().unwrap()),
@@ -124,7 +164,13 @@ fn json_string_check(value: &Value) -> ValueType {
     let frm = value.as_str().unwrap();
     let json_ob = serde_json::from_str(frm);
     match json_ob {
-        Ok(val) => get_value_type(&val),
+        Ok(val) => {
+            let gvt_json_ob = get_value_type(&val);
+            match gvt_json_ob {
+                ValueType::Array | ValueType::Object => gvt_json_ob,
+                _ => ValueType::Str,
+            }
+        }
         Err(_) => ValueType::Str,
     }
 }
